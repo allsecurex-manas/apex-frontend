@@ -1,40 +1,63 @@
 // src/pages/Profile.jsx
 
-import { useEffect, useState } from "react";
-import { jwtDecode } from "jwt-decode";
+import { useAuth } from "react-oidc-context";
+import { useContext } from "react";
+import { ScanContext } from "../context/ScanContext"; // ✅ Context to share scan results
+import { Toaster } from "react-hot-toast";
 
 function Profile() {
-  const [userInfo, setUserInfo] = useState(null);
+  const auth = useAuth();
+  const { scanResult } = useContext(ScanContext);
 
-  useEffect(() => {
-    const idToken = sessionStorage.getItem("id_token");
-    if (idToken) {
-      try {
-        const decoded = jwtDecode(idToken);
-        setUserInfo(decoded);
-      } catch (err) {
-        console.error("Failed to decode token:", err);
-      }
-    }
-  }, []);
+  const userName = auth.user?.profile?.email || "User";
+  const userDomain = userName.split("@")[1];
 
-  if (!userInfo) {
-    return (
-      <div className="flex flex-col justify-center items-center h-screen">
-        <p className="text-gray-700 text-lg">No user information available.</p>
-      </div>
-    );
-  }
+  const lastScanTime = scanResult?.timestamp || "Not Available";
+
+  const calculateSecurityGrade = (result) => {
+    if (!result || !result.groupedResults) return "N/A";
+    const modules = Object.values(result.groupedResults);
+    const totalModules = modules.length;
+    let passed = modules.filter(m => {
+      const firstKey = Object.keys(m)[0];
+      return firstKey && !m[firstKey]?.error;
+    }).length;
+    const percent = (passed / totalModules) * 100;
+    if (percent >= 90) return "A+";
+    if (percent >= 75) return "A";
+    if (percent >= 60) return "B";
+    if (percent >= 45) return "C";
+    return "D";
+  };
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen">
-      <h1 className="text-3xl font-bold mb-6">👤 User Profile</h1>
+    <div className="p-8 bg-gray-50 min-h-screen">
+      <Toaster position="top-center" />
 
-      <div className="bg-white shadow-md rounded p-8 w-full max-w-md">
-        <p className="mb-4"><strong>Username:</strong> {userInfo["cognito:username"]}</p>
-        <p className="mb-4"><strong>Email:</strong> {userInfo.email}</p>
-        <p className="mb-4"><strong>Issued At:</strong> {new Date(userInfo.iat * 1000).toLocaleString()}</p>
-        <p className="mb-4"><strong>Expires At:</strong> {new Date(userInfo.exp * 1000).toLocaleString()}</p>
+      <h1 className="text-3xl font-bold mb-6 text-blue-600">👤 Profile Information</h1>
+
+      <div className="bg-white rounded-lg shadow-md p-6 space-y-4 max-w-xl">
+        <div className="flex justify-between">
+          <span className="font-semibold text-gray-700">Email:</span>
+          <span className="text-gray-900">{userName}</span>
+        </div>
+
+        <div className="flex justify-between">
+          <span className="font-semibold text-gray-700">Domain:</span>
+          <span className="text-gray-900">{userDomain}</span>
+        </div>
+
+        <div className="flex justify-between">
+          <span className="font-semibold text-gray-700">Last Scan Timestamp:</span>
+          <span className="text-gray-900">{lastScanTime}</span>
+        </div>
+
+        <div className="flex justify-between">
+          <span className="font-semibold text-gray-700">Security Grade:</span>
+          <span className="font-bold text-green-600">
+            {calculateSecurityGrade(scanResult)}
+          </span>
+        </div>
       </div>
     </div>
   );

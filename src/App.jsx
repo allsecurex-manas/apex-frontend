@@ -1,13 +1,16 @@
-// src/App.jsx
-
-import { useEffect } from "react";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "react-oidc-context";
-import { useNavigate, Routes, Route, Navigate } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
-import Login from "./pages/Login";  // 👈 Make sure Login.jsx exists (even simple page)
-import Signup from "./pages/Signup"; // 👈 Make sure Signup.jsx exists (even simple page)
+import DashboardHome from "./pages/DashboardHome";
+import Profile from "./pages/Profile";
+import EmailSecurity from "./pages/EmailSecurity";
+import QuantumSecurity from "./pages/QuantumSecurity";
+import DNSSecurity from "./pages/DNSSecurity";
+import ApplicationSecurity from "./pages/ApplicationSecurity";
+import CloudSecurity from "./pages/CloudSecurity";
+import ThirdPartyRisk from "./pages/ThirdPartyRisk";
 
 function ProtectedRoute({ children }) {
   const auth = useAuth();
@@ -28,29 +31,29 @@ function App() {
     window.location.href = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`;
   };
 
-  useEffect(() => {
-    if (auth.isAuthenticated) {
-      navigate("/dashboard");
-    }
-  }, [auth.isAuthenticated, navigate]);
-
-  if (auth.isLoading) {
-    return <div>Loading authentication...</div>;
-  }
-
-  if (auth.error) {
-    return <div>Encountered error: {auth.error.message}</div>;
-  }
+  if (auth.isLoading) return <div>Loading authentication...</div>;
+  if (auth.error) return <div>Authentication Error: {auth.error.message}</div>;
 
   return (
     <>
       <Navbar auth={auth} onLogout={signOutRedirect} />
+
       <div className="pt-20">
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
+          
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>}>
+            <Route index element={<DashboardHome />} />
+            <Route path="profile" element={<Profile />} />
+            <Route path="email-security" element={<EmailSecurity />} />
+            <Route path="quantum-security" element={<QuantumSecurity />} />
+            <Route path="dns-security" element={<DNSSecurity />} />
+            <Route path="application-security" element={<ApplicationSecurity />} />
+            <Route path="cloud-security" element={<CloudSecurity />} />
+            <Route path="thirdparty-risk" element={<ThirdPartyRisk />} />
+          </Route>
+
+          <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </div>
     </>
