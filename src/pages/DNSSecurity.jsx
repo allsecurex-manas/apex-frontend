@@ -2,49 +2,173 @@
 
 import { useContext } from "react";
 import { ScanContext } from "../context/ScanContext";
-import { Toaster } from "react-hot-toast";
+import { Toaster, toast } from "react-hot-toast";
 
 function DNSSecurity() {
-  const { scanResult } = useContext(ScanContext);
+  const { scanResult, loading, getModuleData, hasModuleErrors, getLastScanInfo, startNewScan } = useContext(ScanContext);
+  const dnsSecurityData = getModuleData("dnsSecurity");
+  const lastScan = getLastScanInfo();
 
-  if (!scanResult) {
-    return <div className="p-8">Loading scan results...</div>;
+  const handleStartScan = async () => {
+    try {
+      await startNewScan();
+      toast.success("✅ Scan started successfully!");
+    } catch (error) {
+      toast.error("Failed to start scan");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="bg-white rounded-xl p-8 text-center shadow-lg">
+          <div className="mb-6">
+            <div className="w-16 h-16 mx-auto bg-indigo-100 rounded-full flex items-center justify-center animate-pulse">
+              <span className="text-3xl animate-bounce">🌐</span>
+            </div>
+          </div>
+          <h3 className="text-2xl font-semibold text-indigo-600 mb-4">Analyzing DNS Security</h3>
+          <p className="text-gray-600 mb-4">Please wait while we scan your DNS configuration...</p>
+          <div className="w-full max-w-xs mx-auto h-2 bg-indigo-100 rounded-full overflow-hidden">
+            <div className="h-full bg-indigo-500 animate-progress"></div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  const dnsResults = scanResult.groupedResults?.dnsSecurity;
+  if (!scanResult || !dnsSecurityData) {
+    return (
+      <div className="p-6">
+        <div className="bg-white rounded-xl p-8 text-center shadow-lg transform transition-all hover:scale-[1.01]">
+          <div className="mb-6">
+            <div className="w-16 h-16 mx-auto bg-indigo-100 rounded-full flex items-center justify-center">
+              <span className="text-3xl">🌐</span>
+            </div>
+          </div>
+          <h3 className="text-2xl font-semibold text-indigo-600 mb-4">No DNS Security Data</h3>
+          <p className="text-gray-600 mb-8">Start a new scan to analyze your DNS security posture</p>
+          <button
+            onClick={handleStartScan}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-semibold transition-all transform hover:scale-105 shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+          >
+            Start Security Scan
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Group findings by severity
+  const groupFindingsBySeverity = (findings) => {
+    return findings.reduce((acc, finding) => {
+      const severity = finding.severity || "Unknown";
+      if (!acc[severity]) {
+        acc[severity] = [];
+      }
+      acc[severity].push(finding);
+      return acc;
+    }, {});
+  };
 
   return (
-    <div className="p-8 bg-gray-50 min-h-screen">
+    <div className="p-6 max-w-7xl mx-auto space-y-8">
       <Toaster position="top-center" />
 
-      <h1 className="text-3xl font-bold text-indigo-600 mb-6">
-        🌐 DNS Security Overview
-      </h1>
-
-      {dnsResults ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {Object.entries(dnsResults).map(([recordName, recordData], idx) => (
-            <div
-              key={idx}
-              className={`bg-white shadow-md rounded-lg p-6 ${
-                recordData?.error ? "border-red-500" : "border-green-500"
-              }`}
-            >
-              <h2 className="text-xl font-semibold mb-2 capitalize">
-                {recordName.replace(/([A-Z])/g, " $1").trim()}
-              </h2>
-
-              {recordData?.error ? (
-                <p className="text-red-500">❌ {recordData.error}</p>
-              ) : (
-                <p className="text-green-600">✅ No Issues Detected</p>
+      {/* Header Section */}
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3 mb-2">
+              <span className="text-2xl transform transition-transform hover:rotate-12">🌐</span>
+              DNS Security
+              {hasModuleErrors("dnsSecurity") && (
+                <span className="text-sm text-red-500 bg-red-50 px-3 py-1 rounded-full border border-red-200 animate-pulse">
+                  Issues Detected
+                </span>
               )}
-            </div>
-          ))}
+            </h1>
+            <p className="text-gray-600">
+              Analyzing DNS security for {lastScan?.domain}
+              {lastScan?.time && (
+                <span className="text-sm text-gray-500 ml-2">
+                  (Last scan: {new Date(lastScan.time).toLocaleString()})
+                </span>
+              )}
+            </p>
+          </div>
+          <button
+            onClick={handleStartScan}
+            className="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors duration-150 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 group"
+          >
+            <svg className="w-4 h-4 mr-2 transform group-hover:rotate-180 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Rescan
+          </button>
         </div>
-      ) : (
-        <p className="text-gray-600">No DNS Security data available.</p>
-      )}
+      </div>
+
+      {/* Findings Grid */}
+      <div className="grid grid-cols-1 gap-6">
+        {Object.entries(dnsSecurityData).map(([domain, data]) => {
+          if (!data?.findings || data.findings.length === 0) return null;
+          
+          const groupedFindings = groupFindingsBySeverity(data.findings);
+          
+          return (
+            <div key={domain} className="bg-white rounded-xl shadow-sm overflow-hidden">
+              <div className="p-6 border-b">
+                <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                  {domain}
+                </h2>
+              </div>
+              
+              <div className="p-6">
+                {Object.entries(groupedFindings).map(([severity, findings]) => (
+                  <div key={severity} className="mb-6 last:mb-0">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+                      <span className={`w-3 h-3 rounded-full ${
+                        severity === "Critical" ? "bg-red-500" :
+                        severity === "High" ? "bg-orange-500" :
+                        severity === "Medium" ? "bg-yellow-500" :
+                        severity === "Low" ? "bg-green-500" :
+                        "bg-blue-500"
+                      }`}></span>
+                      {severity} Severity Findings ({findings.length})
+                    </h3>
+                    
+                    <div className="space-y-4">
+                      {findings.map((finding, index) => (
+                        <div 
+                          key={index}
+                          className="border rounded-lg p-4 hover:border-indigo-200 transition-colors duration-200"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <h4 className="font-medium text-gray-900 mb-2">{finding.controlName}</h4>
+                              <p className="text-sm text-gray-600 mb-2">{finding.observation}</p>
+                              {finding.potentialAttacks && (
+                                <div className="text-sm bg-red-50 text-red-700 p-2 rounded mt-2">
+                                  <span className="font-medium">Potential Attacks:</span> {finding.potentialAttacks}
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-xs font-medium text-gray-500">
+                              {finding.controlId}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

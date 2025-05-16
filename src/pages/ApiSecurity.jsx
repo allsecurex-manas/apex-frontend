@@ -1,12 +1,10 @@
-// src/pages/CloudSecurity.jsx
-
 import { useContext } from "react";
 import { ScanContext } from "../context/ScanContext";
 import { Toaster, toast } from "react-hot-toast";
 
-function CloudSecurity() {
+function ApiSecurity() {
   const { scanResult, loading, getModuleData, hasModuleErrors, getLastScanInfo, startNewScan } = useContext(ScanContext);
-  const cloudSecurityData = getModuleData("cloudSecurity");
+  const apiSecurityData = getModuleData("apiSecurity");
   const lastScan = getLastScanInfo();
 
   const handleStartScan = async () => {
@@ -23,34 +21,34 @@ function CloudSecurity() {
       <div className="p-6">
         <div className="bg-white rounded-xl p-8 text-center shadow-lg">
           <div className="mb-6">
-            <div className="w-16 h-16 mx-auto bg-blue-100 rounded-full flex items-center justify-center animate-pulse">
-              <span className="text-3xl animate-bounce">☁️</span>
+            <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center animate-pulse">
+              <span className="text-3xl animate-bounce">🔌</span>
             </div>
           </div>
-          <h3 className="text-2xl font-semibold text-blue-600 mb-4">Analyzing Cloud Security</h3>
-          <p className="text-gray-600 mb-4">Please wait while we scan your cloud infrastructure...</p>
-          <div className="w-full max-w-xs mx-auto h-2 bg-blue-100 rounded-full overflow-hidden">
-            <div className="h-full bg-blue-500 animate-progress"></div>
+          <h3 className="text-2xl font-semibold text-green-600 mb-4">Analyzing API Security</h3>
+          <p className="text-gray-600 mb-4">Please wait while we scan your API endpoints...</p>
+          <div className="w-full max-w-xs mx-auto h-2 bg-green-100 rounded-full overflow-hidden">
+            <div className="h-full bg-green-500 animate-progress"></div>
           </div>
         </div>
       </div>
     );
   }
 
-  if (!scanResult || !cloudSecurityData) {
+  if (!scanResult || !apiSecurityData) {
     return (
       <div className="p-6">
         <div className="bg-white rounded-xl p-8 text-center shadow-lg transform transition-all hover:scale-[1.01]">
           <div className="mb-6">
-            <div className="w-16 h-16 mx-auto bg-blue-100 rounded-full flex items-center justify-center">
-              <span className="text-3xl">☁️</span>
+            <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center">
+              <span className="text-3xl">🔌</span>
             </div>
           </div>
-          <h3 className="text-2xl font-semibold text-blue-600 mb-4">No Cloud Security Data</h3>
-          <p className="text-gray-600 mb-8">Start a new scan to analyze your cloud security posture</p>
+          <h3 className="text-2xl font-semibold text-green-600 mb-4">No API Security Data</h3>
+          <p className="text-gray-600 mb-8">Start a new scan to analyze your API security posture</p>
           <button
             onClick={handleStartScan}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all transform hover:scale-105 shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-all transform hover:scale-105 shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
           >
             Start Security Scan
           </button>
@@ -80,16 +78,16 @@ function CloudSecurity() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3 mb-2">
-              <span className="text-2xl transform transition-transform hover:rotate-12">☁️</span>
-              Cloud Security
-              {hasModuleErrors("cloudSecurity") && (
+              <span className="text-2xl transform transition-transform hover:rotate-12">🔌</span>
+              API Security
+              {hasModuleErrors("apiSecurity") && (
                 <span className="text-sm text-red-500 bg-red-50 px-3 py-1 rounded-full border border-red-200 animate-pulse">
                   Issues Detected
                 </span>
               )}
             </h1>
             <p className="text-gray-600">
-              Analyzing cloud security for {lastScan?.domain}
+              Analyzing API security for {lastScan?.domain}
               {lastScan?.time && (
                 <span className="text-sm text-gray-500 ml-2">
                   (Last scan: {new Date(lastScan.time).toLocaleString()})
@@ -99,7 +97,7 @@ function CloudSecurity() {
           </div>
           <button
             onClick={handleStartScan}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-150 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 group"
+            className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-150 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 group"
           >
             <svg className="w-4 h-4 mr-2 transform group-hover:rotate-180 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -111,8 +109,8 @@ function CloudSecurity() {
 
       {/* Findings Grid */}
       <div className="grid grid-cols-1 gap-6">
-        {Object.entries(cloudSecurityData).map(([domain, data]) => {
-          if (!data.findings || data.findings.length === 0) return null;
+        {Object.entries(apiSecurityData).map(([domain, data]) => {
+          if (!data?.findings || data.findings.length === 0) return null;
           
           const groupedFindings = groupFindingsBySeverity(data.findings);
           
@@ -120,7 +118,7 @@ function CloudSecurity() {
             <div key={domain} className="bg-white rounded-xl shadow-sm overflow-hidden">
               <div className="p-6 border-b">
                 <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                  <span className="w-2 h-2 rounded-full bg-green-500"></span>
                   {domain}
                 </h2>
               </div>
@@ -133,6 +131,7 @@ function CloudSecurity() {
                         severity === "Critical" ? "bg-red-500" :
                         severity === "High" ? "bg-orange-500" :
                         severity === "Medium" ? "bg-yellow-500" :
+                        severity === "Low" ? "bg-green-500" :
                         "bg-blue-500"
                       }`}></span>
                       {severity} Severity Findings ({findings.length})
@@ -142,7 +141,7 @@ function CloudSecurity() {
                       {findings.map((finding, index) => (
                         <div 
                           key={index}
-                          className="border rounded-lg p-4 hover:border-blue-200 transition-colors duration-200"
+                          className="border rounded-lg p-4 hover:border-green-200 transition-colors duration-200"
                         >
                           <div className="flex items-start justify-between gap-4">
                             <div>
@@ -172,4 +171,4 @@ function CloudSecurity() {
   );
 }
 
-export default CloudSecurity;
+export default ApiSecurity;

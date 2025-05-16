@@ -19,155 +19,70 @@ export function ScanProvider({ children }) {
     return email.split("@")[1];
   };
 
-  // Function to fetch the last scan result
-  const fetchLastScanResult = async (domain) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await axios.get(`https://apex.allsecurex.com/api/fullScan/latest/${domain}`);
-      
-      if (response.data && response.data.scanId) {
-        const report = await axios.get(`https://apex.allsecurex.com/api/fullScan/report/${response.data.scanId}`);
-        
-        // Process and structure the data
-        const processedData = {
-          ...report.data,
-          scanTime: response.data.timestamp || new Date().toISOString(),
-          domain: domain,
-        };
-        
-        // Ensure the data structure is correct
-        if (!processedData.groupedResults) {
-          processedData.groupedResults = {};
-        }
-
-        // Add default structure for quantum security if not present
-        if (!processedData.groupedResults.quantumSecurity) {
-          processedData.groupedResults.quantumSecurity = {};
-        }
-
-        setScanResult(processedData);
-        setLastScanTime(response.data.timestamp || new Date().toISOString());
-      } else {
-        // If no previous scan exists, start a new one
-        await startNewScan();
+  // Load data from localStorage
+  useEffect(() => {
+    const savedData = localStorage.getItem('scanData');
+    if (savedData) {
+      try {
+        const { result, timestamp } = JSON.parse(savedData);
+        setScanResult(result);
+        setLastScanTime(timestamp);
+      } catch (error) {
+        console.error('Error loading saved scan data:', error);
       }
-    } catch (error) {
-      console.error("Error fetching last scan:", error);
-      // If we can't fetch the last scan, start a new one
-      await startNewScan();
-    } finally {
-      setLoading(false);
     }
-  };
+  }, []);
 
-  const startNewScan = async () => {
-    const domain = extractDomain(auth.user?.profile?.email);
-    
-    if (!domain) {
-      const error = "Cannot extract domain from email address.";
-      setError(error);
-      toast.error(`❌ ${error}`);
-      return;
+  // Save data to localStorage whenever it changes
+  useEffect(() => {
+    if (scanResult && lastScanTime) {
+      try {
+        localStorage.setItem('scanData', JSON.stringify({
+          result: scanResult,
+          timestamp: lastScanTime
+        }));
+      } catch (error) {
+        console.error('Error saving scan data:', error);
+      }
     }
-
-    try {
-      setLoading(true);
-      setError(null);
-      setScanResult(null); // Clear previous results
-      toast.loading(`🚀 Starting scan for ${domain}`, { id: "scan" });
-
-      const res = await axios.post(`https://apex.allsecurex.com/api/fullScan/scan`, { domain });
-      const scanId = res.data.scanId;
-
-      let retries = 0;
-      const maxRetries = 20; // 1 minute timeout (3s * 20)
-
-      // Polling with timeout and retry logic
-      const interval = setInterval(async () => {
-        try {
-          if (retries >= maxRetries) {
-            clearInterval(interval);
-            throw new Error("Scan timed out. Please try again.");
-          }
-
-          const status = await axios.get(`https://apex.allsecurex.com/api/fullScan/status/${scanId}`);
-          
-          if (status.data.status === "completed") {
-            clearInterval(interval);
-            const report = await axios.get(`https://apex.allsecurex.com/api/fullScan/report/${scanId}`);
-            
-            // Process and structure the data
-            const processedData = {
-              ...report.data,
-              scanTime: new Date().toISOString(),
-              domain: domain,
-            };
-            
-            // Ensure the data structure is correct
-            if (!processedData.groupedResults) {
-              processedData.groupedResults = {};
-            }
-
-            // Add default structure for quantum security if not present
-            if (!processedData.groupedResults.quantumSecurity) {
-              processedData.groupedResults.quantumSecurity = {};
-            }
-
-            setScanResult(processedData);
-            setLastScanTime(new Date().toISOString());
-            toast.success("✅ Scan completed successfully!", { id: "scan" });
-            setLoading(false);
-          } else if (status.data.status === "failed") {
-            clearInterval(interval);
-            throw new Error("Scan failed. Please try again.");
-          }
-          
-          retries++;
-        } catch (error) {
-          clearInterval(interval);
-          setError(error.message);
-          toast.error(`❌ ${error.message}`, { id: "scan" });
-          setLoading(false);
-        }
-      }, 3000);
-
-    } catch (error) {
-      const errorMessage = error.response?.data?.message || error.message || "Failed to start scan.";
-      setError(errorMessage);
-      toast.error(`❌ ${errorMessage}`, { id: "scan" });
-      setLoading(false);
-    }
-  };
+  }, [scanResult, lastScanTime]);
 
   // Get module-specific data with proper error handling
   const getModuleData = (moduleName) => {
     try {
-      if (!scanResult?.groupedResults) return null;
-      
-      const moduleData = scanResult.groupedResults[moduleName];
-      if (!moduleData) {
-        console.warn(`No data found for module: ${moduleName}`);
+      if (!scanResult) {
+        console.warn(`No scan result found`);
         return null;
       }
 
-      // For quantum security, ensure we return the correct structure
-      if (moduleName === 'quantumSecurity') {
-        // Find the main domain data (non-wildcard)
-        const mainDomainData = Object.entries(moduleData).find(([key, value]) => 
-          !key.startsWith('*') && !value.error
-        );
-        
-        if (mainDomainData) {
-          return {
-            [mainDomainData[0]]: mainDomainData[1],
-            ...moduleData
-          };
-        }
-      }
+      console.log('Full scan result in getModuleData:', scanResult);
 
-      return moduleData;
+      // Direct handling based on the requested module
+      switch(moduleName) {
+        case 'spf':
+          console.log('Looking for SPF security data in:', scanResult);
+          return scanResult.spfSecurity || null;
+        case 'dkim':
+          console.log('Looking for DKIM security data in:', scanResult);
+          return scanResult.dkimSecurity || null;
+        case 'dmarc':
+          console.log('Looking for DMARC security data in:', scanResult);
+          return scanResult.dmarcSecurity || null;
+        default:
+          // For other modules, use groupedResults
+          if (!scanResult.groupedResults) {
+            console.warn(`No groupedResults found in scanResult:`, scanResult);
+            return null;
+          }
+          
+          const moduleData = scanResult.groupedResults?.[moduleName];
+          if (!moduleData) {
+            console.warn(`No data found for module: ${moduleName}`);
+            return null;
+          }
+
+          return moduleData;
+      }
     } catch (error) {
       console.error(`Error getting data for module ${moduleName}:`, error);
       return null;
@@ -198,34 +113,151 @@ export function ScanProvider({ children }) {
 
   // Get last scan information with validation
   const getLastScanInfo = () => {
-    if (!lastScanTime || !scanResult?.domain) return null;
+    if (!scanResult) return null;
+    
     return {
+      domain: scanResult.domain,
       time: lastScanTime,
-      domain: scanResult.domain || extractDomain(auth.user?.profile?.email),
     };
   };
 
-  // Fetch last scan result when authenticated
+  // Update the data processing in fetchLastScanResult and startNewScan
+  const processReportData = (report, domain, timestamp) => {
+    console.log('Raw API response in processReportData:', report.data);
+    
+    // Keep the original data structure, just add metadata
+    const processedData = {
+      ...report.data,
+      scanTime: timestamp || new Date().toISOString(),
+      domain: domain,
+      // Ensure security groups are preserved at the top level
+      spfSecurity: report.data.spfSecurity,
+      dkimSecurity: report.data.dkimSecurity,
+      dmarcSecurity: report.data.dmarcSecurity
+    };
+
+    // Initialize groupedResults if needed for other modules
+    if (!processedData.groupedResults) {
+      processedData.groupedResults = {};
+    }
+
+    console.log('Processed scan data:', processedData);
+    return processedData;
+  };
+
+  const fetchLastScanResult = async (domain) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await axios.get(`https://apex.allsecurex.com/api/fullScan/latest/${domain}`);
+      
+      if (response.data && response.data.scanId) {
+        const report = await axios.get(`https://apex.allsecurex.com/api/fullScan/report/${response.data.scanId}`);
+        const processedData = processReportData(report, domain, response.data.timestamp);
+        setScanResult(processedData);
+        setLastScanTime(response.data.timestamp || new Date().toISOString());
+      } else {
+        setScanResult(null);
+        setLastScanTime(null);
+        localStorage.removeItem('scanData');
+      }
+    } catch (error) {
+      console.error("Error fetching last scan:", error);
+      setError("Failed to fetch scan results. Please try starting a new scan.");
+      toast.error("❌ Failed to fetch scan results");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Effect to fetch last scan result when user is authenticated
   useEffect(() => {
-    if (auth.isAuthenticated && auth.user?.profile?.email && !scanResult && !loading) {
-      const domain = extractDomain(auth.user?.profile?.email);
-      if (domain) {
+    if (auth.isAuthenticated && auth.user?.profile?.email) {
+      const domain = extractDomain(auth.user.profile.email);
+      if (domain && !scanResult) {
         fetchLastScanResult(domain);
       }
     }
-  }, [auth.isAuthenticated, auth.user]);
+  }, [auth.isAuthenticated, auth.user?.profile?.email]);
+
+  const startNewScan = async () => {
+    const domain = extractDomain(auth.user?.profile?.email);
+    
+    if (!domain) {
+      const error = "Cannot extract domain from email address.";
+      setError(error);
+      toast.error(`❌ ${error}`);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      setScanResult(null);
+      localStorage.removeItem('scanData');
+      toast.loading(`🚀 Starting scan for ${domain}`, { id: "scan" });
+
+      const res = await axios.post(`https://apex.allsecurex.com/api/fullScan/scan`, { domain });
+      console.log('Scan initiated response:', res.data);
+      const scanId = res.data.scanId;
+
+      let retries = 0;
+      const maxRetries = 20;
+
+      const interval = setInterval(async () => {
+        try {
+          if (retries >= maxRetries) {
+            clearInterval(interval);
+            throw new Error("Scan timed out. Please try again.");
+          }
+
+          const status = await axios.get(`https://apex.allsecurex.com/api/fullScan/status/${scanId}`);
+          console.log('Scan status:', status.data);
+          
+          if (status.data.status === "completed") {
+            clearInterval(interval);
+            const report = await axios.get(`https://apex.allsecurex.com/api/fullScan/report/${scanId}`);
+            console.log('Raw scan report:', report.data);
+            
+            const processedData = processReportData(report, domain, new Date().toISOString());
+            console.log('Setting scan result to:', processedData);
+            setScanResult(processedData);
+            setLastScanTime(new Date().toISOString());
+            toast.success("✅ Scan completed successfully!", { id: "scan" });
+            setLoading(false);
+          } else if (status.data.status === "failed") {
+            clearInterval(interval);
+            throw new Error("Scan failed. Please try again.");
+          }
+          
+          retries++;
+        } catch (error) {
+          clearInterval(interval);
+          setError(error.message);
+          toast.error(`❌ ${error.message}`, { id: "scan" });
+          setLoading(false);
+        }
+      }, 3000);
+
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || error.message || "Failed to start scan.";
+      setError(errorMessage);
+      toast.error(`❌ ${errorMessage}`, { id: "scan" });
+      setLoading(false);
+    }
+  };
 
   return (
-    <ScanContext.Provider 
-      value={{ 
-        scanResult, 
-        startNewScan, 
-        loading, 
+    <ScanContext.Provider
+      value={{
+        scanResult,
+        loading,
         error,
+        startNewScan,
         getModuleData,
         hasModuleErrors,
         getLastScanInfo,
-        lastScanTime
       }}
     >
       {children}

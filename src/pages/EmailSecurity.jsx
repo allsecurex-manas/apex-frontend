@@ -1,412 +1,262 @@
 // src/pages/EmailSecurity.jsx
 
-import { useContext, useMemo } from "react";
+import { useContext } from "react";
 import { ScanContext } from "../context/ScanContext";
 import { Toaster, toast } from "react-hot-toast";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts";
-
-const SEVERITY_COLORS = {
-  High: "#EF4444",
-  Medium: "#F59E0B",
-  Low: "#10B981",
-  Informational: "#3B82F6",
-};
-
-const CHART_COLORS = ["#10B981", "#F59E0B", "#EF4444", "#3B82F6"];
-
-// Custom styles
-const styles = {
-  emailControl: `bg-[#f8fafc] rounded-lg p-4 mb-4 border-l-4 border-blue-500`,
-  emailControlHeader: `flex justify-between items-center mb-2`,
-  emailControlTitle: `font-semibold text-blue-800`,
-  statusBadge: `inline-block px-2 py-1 rounded text-xs font-semibold`,
-  statusConfigured: `bg-green-100 text-green-800`,
-  statusMissing: `bg-red-100 text-red-800`,
-  statusPartial: `bg-yellow-100 text-yellow-800`,
-  controlDetails: `mt-2 text-sm`,
-  controlExplanation: `mt-2 p-3 bg-gray-100 rounded text-sm`,
-  recommendation: `mt-3 p-3 bg-blue-50 rounded border-l-3 border-blue-600`,
-  findingsContainer: `mt-4`,
-  sectionHeader: `mb-4`,
-};
 
 function EmailSecurity() {
-  const { scanResult, loading, getModuleData, hasModuleErrors, getLastScanInfo, startNewScan } = useContext(ScanContext);
+  const { scanResult, loading, getLastScanInfo, startNewScan } = useContext(ScanContext);
   const lastScan = getLastScanInfo();
+  
+  console.log('Current scan result:', scanResult);
 
-  // Get all email security related data
-  const spfData = getModuleData("spfSecurity");
-  const dmarcData = getModuleData("dmarcSecurity");
-  const dkimData = getModuleData("dkimSecurity");
+  // Get security data for the main domain (excluding wildcards and www)
+  const getMainDomainData = (securityData) => {
+    if (!securityData) return null;
+    const mainDomain = Object.keys(securityData).find(domain => 
+      !domain.startsWith('*') && !domain.startsWith('www.')
+    );
+    return mainDomain ? securityData[mainDomain] : null;
+  };
 
-  // Prepare chart data
-  const prepareChartData = useMemo(() => {
-    if (!spfData || !dmarcData || !dkimData) return null;
-
-    try {
-      // Get main domain data
-      const mainDomain = Object.keys(spfData).find(domain => !domain.startsWith('*'));
-      if (!mainDomain) return null;
-
-      // Combine all findings
-      const allFindings = [
-        ...(spfData[mainDomain]?.findings || []),
-        ...(dmarcData[mainDomain]?.findings || []),
-        ...(dkimData[mainDomain]?.findings || []),
-      ];
-
-      // Severity distribution
-      const severityData = allFindings.reduce((acc, finding) => {
-        acc[finding.severity] = (acc[finding.severity] || 0) + 1;
-        return acc;
-      }, {});
-
-      const pieData = Object.entries(severityData).map(([severity, count]) => ({
-        name: severity,
-        value: count,
-      }));
-
-      // Control distribution
-      const controlData = {
-        SPF: spfData[mainDomain]?.findings?.length || 0,
-        DMARC: dmarcData[mainDomain]?.findings?.length || 0,
-        DKIM: dkimData[mainDomain]?.findings?.length || 0,
-      };
-
-      const barData = Object.entries(controlData).map(([control, count]) => ({
-        name: control,
-        Issues: count,
-      }));
-
-      return {
-        pieData,
-        barData,
-        mainDomain,
-        allFindings,
-        records: {
-          spf: spfData[mainDomain]?.rawSPFRecord,
-          dmarc: dmarcData[mainDomain]?.rawDMARCRecord,
-          dkim: dkimData[mainDomain]?.rawDKIMRecord,
-        },
-      };
-    } catch (error) {
-      console.error("Error preparing email security chart data:", error);
-      return null;
-    }
-  }, [spfData, dmarcData, dkimData]);
+  // Get security data from groupedResults
+  const spfData = getMainDomainData(scanResult?.groupedResults?.spfSecurity);
+  const dkimData = getMainDomainData(scanResult?.groupedResults?.dkimSecurity);
+  const dmarcData = getMainDomainData(scanResult?.groupedResults?.dmarcSecurity);
+  
+  console.log('Retrieved security data:', {
+    spf: spfData,
+    dkim: dkimData,
+    dmarc: dmarcData
+  });
 
   const handleStartScan = async () => {
     try {
+      console.log('Starting new scan...');
       await startNewScan();
+      toast.success("✅ Scan started successfully!");
     } catch (error) {
-      toast.error("Failed to start the scan. Please try again.");
+      console.error('Scan start error:', error);
+      toast.error("Failed to start scan");
     }
   };
 
-  // Calculate overall security score
-  const calculateSecurityScore = () => {
-    if (!prepareChartData) return 0;
-    const { records } = prepareChartData;
-    let score = 0;
-    if (records.spf) score += 33.33;
-    if (records.dmarc) score += 33.33;
-    if (records.dkim) score += 33.34;
-    return Math.round(score);
-  };
-
   if (loading) {
+    console.log('Component in loading state');
     return (
-      <div className="page-wrapper">
-        <div className="main-content">
-          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl shadow-lg">
-            <div className="animate-spin text-6xl mb-6">📧</div>
-            <h3 className="text-2xl font-semibold text-blue-600 mb-4">Analyzing Email Security</h3>
-            <p className="text-gray-600">Checking SPF, DKIM, and DMARC configurations...</p>
+      <div className="p-6">
+        <div className="bg-white rounded-xl p-8 text-center shadow-lg">
+          <div className="mb-6">
+            <div className="w-16 h-16 mx-auto bg-orange-100 rounded-full flex items-center justify-center animate-pulse">
+              <span className="text-3xl animate-bounce">📧</span>
+            </div>
+          </div>
+          <h3 className="text-2xl font-semibold text-orange-600 mb-4">Analyzing Email Security</h3>
+          <p className="text-gray-600 mb-4">Please wait while we scan your email security configurations...</p>
+          <div className="w-full max-w-xs mx-auto h-2 bg-orange-100 rounded-full overflow-hidden">
+            <div className="h-full bg-orange-500 animate-progress"></div>
           </div>
         </div>
       </div>
     );
   }
 
-  if (!scanResult || !prepareChartData) {
+  if (!scanResult || (!spfData && !dkimData && !dmarcData)) {
+    console.log('No scan data available, showing empty state');
     return (
-      <div className="page-wrapper">
-        <div className="main-content">
-          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl shadow-lg">
-            <div className="text-6xl mb-6">📧</div>
-            <h3 className="text-2xl font-semibold text-blue-600 mb-4">No Email Security Data</h3>
-            <p className="text-gray-600 mb-8">Start a new scan to analyze email security posture.</p>
-            <button
-              onClick={handleStartScan}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Start New Scan
-            </button>
+      <div className="p-6">
+        <div className="bg-white rounded-xl p-8 text-center shadow-lg transform transition-all hover:scale-[1.01]">
+          <div className="mb-6">
+            <div className="w-16 h-16 mx-auto bg-orange-100 rounded-full flex items-center justify-center">
+              <span className="text-3xl">📧</span>
+            </div>
           </div>
+          <h3 className="text-2xl font-semibold text-orange-600 mb-4">No Email Security Data</h3>
+          <p className="text-gray-600 mb-8">Start a new scan to analyze your email security posture</p>
+          <button
+            onClick={handleStartScan}
+            className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-3 rounded-lg font-semibold transition-all transform hover:scale-105 shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
+          >
+            Start Security Scan
+          </button>
         </div>
       </div>
     );
   }
 
-  const { pieData, barData, mainDomain, allFindings, records } = prepareChartData;
-  const securityScore = calculateSecurityScore();
+  const renderStatusCard = (title, data, recordKey) => {
+    console.log(`Rendering status card for ${title}:`, data);
+    
+    const getStatusFromFindings = (findings) => {
+      if (!findings || findings.length === 0) return 'pass';
+      const severities = findings.map(f => f.severity.toLowerCase());
+      if (severities.includes('critical')) return 'fail';
+      if (severities.includes('high')) return 'fail';
+      if (severities.includes('medium')) return 'partial';
+      if (severities.includes('low')) return 'partial';
+      return 'pass';
+    };
 
-  return (
-    <div className="page-wrapper">
-      <button className="sidebar-toggle" id="sidebarToggle" title="Toggle Sidebar">
-        <i className="fas fa-bars"></i>
-      </button>
+    const status = getStatusFromFindings(data?.findings);
+    const rawRecord = data?.[recordKey];
 
-      <div className="main-content">
-        <Toaster position="top-center" />
+    const getStatusColor = (status) => {
+      switch (status?.toLowerCase()) {
+        case 'pass':
+          return 'bg-green-100 text-green-800 border-green-200';
+        case 'fail':
+          return 'bg-red-100 text-red-800 border-red-200';
+        case 'partial':
+          return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        default:
+          return 'bg-gray-100 text-gray-800 border-gray-200';
+      }
+    };
 
-        {/* Header Section */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-4xl font-bold text-blue-700 flex items-center gap-2">
-                📧 Email Security
-                {allFindings.length > 0 && (
-                  <span className="text-sm text-red-500 bg-red-50 px-3 py-1 rounded-full">
-                    {allFindings.length} Issues Found
-                  </span>
-                )}
-              </h1>
-              <p className="text-gray-600 mt-2">
-                Email Authentication and Protection for {lastScan?.domain || mainDomain}
-                {lastScan?.time && (
-                  <span className="text-sm text-gray-500 ml-2">
-                    (Last scan: {new Date(lastScan.time).toLocaleString()})
-                  </span>
-                )}
-              </p>
-            </div>
-            <button
-              onClick={handleStartScan}
-              className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              🔄 Rescan
-            </button>
-          </div>
+    return (
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+          <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(status)}`}>
+            {status.toUpperCase()}
+          </span>
         </div>
-
-        {/* Security Controls Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className={styles.emailControl}>
-            <div className={styles.emailControlHeader}>
-              <h3 className={styles.emailControlTitle}>SPF Status</h3>
-              <span className={`${styles.statusBadge} ${records.spf ? styles.statusConfigured : styles.statusMissing}`}>
-                {records.spf ? "Configured" : "Missing"}
-              </span>
-            </div>
-            <div className={styles.controlDetails}>
-              <code className="text-sm break-all">{records.spf || "No SPF record found"}</code>
-            </div>
-            <div className={styles.controlExplanation}>
-              SPF allows domain owners to specify which mail servers are authorized to send email on behalf of their domain.
-            </div>
-            {!records.spf && (
-              <div className={styles.recommendation}>
-                <strong>Recommendation:</strong> Configure SPF by adding a TXT record to your DNS with the format: v=spf1 include:_spf.your-mail-provider.com ~all
-              </div>
-            )}
+        <div className="space-y-3">
+          <div className="flex flex-col space-y-2">
+            <span className="text-sm text-gray-600">Record</span>
+            <span className="font-mono text-sm bg-gray-50 p-2 rounded break-all">
+              {rawRecord || 'Not configured'}
+            </span>
           </div>
-
-          <div className={styles.emailControl}>
-            <div className={styles.emailControlHeader}>
-              <h3 className={styles.emailControlTitle}>DKIM Status</h3>
-              <span className={`${styles.statusBadge} ${records.dkim ? styles.statusConfigured : styles.statusMissing}`}>
-                {records.dkim ? "Configured" : "Missing"}
-              </span>
-            </div>
-            <div className={styles.controlDetails}>
-              <code className="text-sm break-all">{records.dkim || "No DKIM record found"}</code>
-            </div>
-            <div className={styles.controlExplanation}>
-              DKIM adds a digital signature to emails, allowing receiving servers to verify that the email was not altered in transit.
-            </div>
-            {!records.dkim && (
-              <div className={styles.recommendation}>
-                <strong>Recommendation:</strong> Configure DKIM by generating key pairs and adding the public key as a DNS TXT record.
-              </div>
-            )}
-          </div>
-
-          <div className={styles.emailControl}>
-            <div className={styles.emailControlHeader}>
-              <h3 className={styles.emailControlTitle}>DMARC Status</h3>
-              <span className={`${styles.statusBadge} ${records.dmarc ? styles.statusConfigured : styles.statusMissing}`}>
-                {records.dmarc ? "Configured" : "Missing"}
-              </span>
-            </div>
-            <div className={styles.controlDetails}>
-              <code className="text-sm break-all">{records.dmarc || "No DMARC record found"}</code>
-            </div>
-            <div className={styles.controlExplanation}>
-              DMARC tells receiving mail servers what to do if an email fails SPF or DKIM authentication checks.
-            </div>
-            {!records.dmarc && (
-              <div className={styles.recommendation}>
-                <strong>Recommendation:</strong> Set up DMARC to define how receiving servers should handle failed SPF/DKIM checks.
-              </div>
-            )}
-          </div>
-
-          <div className={styles.emailControl}>
-            <div className={styles.emailControlHeader}>
-              <h3 className={styles.emailControlTitle}>Overall Score</h3>
-              <span className={`${styles.statusBadge} ${
-                securityScore >= 75 ? styles.statusConfigured :
-                securityScore >= 50 ? styles.statusPartial :
-                styles.statusMissing
-              }`}>
-                {securityScore}/100
-              </span>
-            </div>
-            <div className={styles.controlExplanation}>
-              Combined security score based on the implementation of SPF, DKIM, and DMARC protocols.
-            </div>
-          </div>
-        </div>
-
-        {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* Severity Distribution */}
-          <div className="bg-white rounded-xl p-6 shadow-lg">
-            <h3 className="text-xl font-semibold text-blue-700 mb-4">Issue Severity Distribution</h3>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={100}
-                    label
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Issues by Protocol */}
-          <div className="bg-white rounded-xl p-6 shadow-lg">
-            <h3 className="text-xl font-semibold text-blue-700 mb-4">Issues by Protocol</h3>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="Issues" fill="#3B82F6" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-
-        {/* Findings Table */}
-        <div className="bg-white rounded-xl p-6 shadow-lg">
-          <h3 className="text-xl font-semibold text-blue-700 mb-4">Detailed Findings</h3>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead>
-                <tr>
-                  <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Control ID
-                  </th>
-                  <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Control Name
-                  </th>
-                  <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Severity
-                  </th>
-                  <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Observation
-                  </th>
-                  <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Potential Attacks
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {allFindings.map((finding, index) => (
-                  <tr key={`${finding.controlId}-${index}`} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {finding.controlId}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {finding.controlName}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        finding.severity === "High" 
-                          ? "bg-red-100 text-red-800"
-                          : finding.severity === "Medium"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : finding.severity === "Low"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-blue-100 text-blue-800"
+          {data?.findings?.length > 0 && (
+            <div className="mt-4">
+              <h4 className="text-sm font-medium text-gray-900 mb-2">Findings</h4>
+              <div className="space-y-2">
+                {data.findings.map((finding, idx) => (
+                  <div key={idx} className="text-sm bg-gray-50 p-2 rounded">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-gray-600">{finding.observation}</span>
+                      <span className={`shrink-0 px-2 py-1 rounded-full text-xs font-medium ${
+                        finding.severity === "Critical" ? "bg-red-100 text-red-800" :
+                        finding.severity === "High" ? "bg-orange-100 text-orange-800" :
+                        finding.severity === "Medium" ? "bg-yellow-100 text-yellow-800" :
+                        finding.severity === "Low" ? "bg-blue-100 text-blue-800" :
+                        "bg-gray-100 text-gray-800"
                       }`}>
                         {finding.severity}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {finding.observation}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {finding.potentialAttacks}
-                    </td>
-                  </tr>
+                    </div>
+                    {finding.potentialAttacks && (
+                      <div className="mt-1 text-xs text-red-600">
+                        Potential Attacks: {finding.potentialAttacks}
+                      </div>
+                    )}
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Raw Data Section */}
-        <div className="mt-8 bg-white rounded-xl p-6 shadow-lg">
-          <button
-            onClick={() => {
-              const rawDataContainer = document.getElementById('rawDataContainer');
-              if (rawDataContainer) {
-                rawDataContainer.style.display = 
-                  rawDataContainer.style.display === 'none' ? 'block' : 'none';
-              }
-            }}
-            className="mb-4 px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-          >
-            Toggle Raw Data
-          </button>
-          <div id="rawDataContainer" className="hidden">
-            <pre className="bg-gray-900 text-gray-100 p-4 rounded overflow-x-auto">
-              {JSON.stringify(prepareChartData, null, 2)}
-            </pre>
-          </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+    );
+  };
+
+  // Combine findings from all three components
+  const allFindings = [
+    ...(spfData?.findings || []),
+    ...(dkimData?.findings || []),
+    ...(dmarcData?.findings || [])
+  ];
+  console.log('Combined findings:', allFindings);
+
+  return (
+    <div className="p-6 max-w-7xl mx-auto space-y-8">
+      <Toaster position="top-center" />
+
+      {/* Header Section */}
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3 mb-2">
+              <span className="text-2xl transform transition-transform hover:rotate-12">📧</span>
+              Email Security
+              {allFindings.length > 0 && (
+                <span className="text-sm text-red-500 bg-red-50 px-3 py-1 rounded-full border border-red-200 animate-pulse">
+                  {allFindings.length} Issues Detected
+                </span>
+              )}
+            </h1>
+            <p className="text-gray-600">
+              Analyzing email security for {lastScan?.domain}
+              {lastScan?.time && (
+                <span className="text-sm text-gray-500 ml-2">
+                  (Last scan: {new Date(lastScan.time).toLocaleString()})
+                </span>
+              )}
+            </p>
+          </div>
+          <button
+            onClick={handleStartScan}
+            className="inline-flex items-center px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors duration-150 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 group"
+          >
+            <svg className="w-4 h-4 mr-2 transform group-hover:rotate-180 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Rescan
+          </button>
+        </div>
+      </div>
+
+      {/* Email Security Status Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* SPF Card */}
+        {renderStatusCard("SPF Record", spfData, "rawSPFRecord")}
+
+        {/* DMARC Card */}
+        {renderStatusCard("DMARC Record", dmarcData, "rawDMARCRecord")}
+
+        {/* DKIM Card */}
+        {renderStatusCard("DKIM Record", dkimData, "rawDKIMRecord")}
+      </div>
+
+      {/* Findings Section */}
+      {allFindings.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden mt-6">
+          <div className="p-6 border-b">
+            <h3 className="text-lg font-medium text-gray-900">Security Findings</h3>
+          </div>
+          <div className="p-6">
+            <div className="space-y-4">
+              {allFindings.map((finding, index) => (
+                <div 
+                  key={index}
+                  className="border rounded-lg p-4 hover:border-orange-200 transition-colors duration-200"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h4 className="font-medium text-gray-900 mb-2">{finding.controlName}</h4>
+                      <p className="text-sm text-gray-600 mb-2">{finding.observation}</p>
+                      {finding.potentialAttacks && (
+                        <div className="text-sm bg-red-50 text-red-700 p-2 rounded mt-2">
+                          <span className="font-medium">Potential Attacks:</span> {finding.potentialAttacks}
+                        </div>
+                      )}
+                    </div>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      finding.severity === "Critical" ? "bg-red-100 text-red-800" :
+                      finding.severity === "High" ? "bg-orange-100 text-orange-800" :
+                      finding.severity === "Medium" ? "bg-yellow-100 text-yellow-800" :
+                      "bg-blue-100 text-blue-800"
+                    }`}>
+                      {finding.severity}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
