@@ -2,9 +2,9 @@
 
 function LogoutButton() {
   const handleLogout = () => {
-    const clientId = "5mu1v00cuedvsp7hrl7acmlpa3"; // 👈 Your real App Client ID
+    const clientId = "5v74q9ljb7476b0nofe8sq23c8"; // 👈 Your real App Client ID
     const domain = "ap-south-1eymv9kl76.auth.ap-south-1.amazoncognito.com"; // 👈 Your real Cognito domain
-    const redirectUri = "https://apex.allsecurex.com"; // 👈 Redirect user after logout
+    const redirectUri = "http://localhost:5173/"; // 👈 Redirect user after logout
 
     const logoutUrl = `https://${domain}/logout?client_id=${clientId}&logout_uri=${redirectUri}`;
 

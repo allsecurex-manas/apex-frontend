@@ -150,10 +150,10 @@ export function ScanProvider({ children }) {
       setLoading(true);
       setError(null);
       
-      const response = await axios.get(`https://apex.allsecurex.com/api/fullScan/latest/${domain}`);
+      const response = await axios.post(`https://apex.allsecurex.com/api/fullScan/latest/${domain}`);
       
       if (response.data && response.data.scanId) {
-        const report = await axios.get(`https://apex.allsecurex.com/api/fullScan/report/${response.data.scanId}`);
+        const report = await axios.post(`https://apex.allsecurex.com/api/fullScan/report/${response.data.scanId}`);
         const processedData = processReportData(report, domain, response.data.timestamp);
         setScanResult(processedData);
         setLastScanTime(response.data.timestamp || new Date().toISOString());

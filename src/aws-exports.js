@@ -2,7 +2,7 @@ const awsConfig = {
   Auth: {
     region: "ap-south-1",
     userPoolId: "ap-south-1_eYMv9KL76",
-    userPoolWebClientId: "YO5mu1v00cuedvsp7hrl7acmlpa3",
+    userPoolWebClientId: "5v74q9ljb7476b0nofe8sq23c8",
     mandatorySignIn: true
   }
 };
